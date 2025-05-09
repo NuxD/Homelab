@@ -1,0 +1,45 @@
+- name: Update APT package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Upgrade all packages
+  apt:
+    upgrade: dist
+    autoremove: yes
+    autoclean: yes
+
+- name: Install essential packages
+  apt:
+    name:
+      - curl
+      - git
+      - unzip
+      - htop
+      - vim
+      - python3-pip
+      - net-tools
+    state: present
+
+- name: Set timezone to UTC
+  timezone:
+    name: Etc/UTC
+
+- name: Create a user SSH directory if it doesn't exist
+  file:
+    path: "/home/{{ ansible_user }}/.ssh"
+    state: directory
+    mode: 0700
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Copy public key to authorized_keys
+  copy:
+    src: "~/.ssh/id_ed25519.pub"
+    dest: "/home/{{ ansible_user }}/.ssh/authorized_keys"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: 0600
+  delegate_to: localhost
+  become: false
+

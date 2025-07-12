@@ -1,0 +1,59 @@
+---
+- name: Create homelab user on all nodes
+  hosts: all
+  become: yes
+  vars:
+    homelab_user: "jedi"
+    homelab_password: "{{ vault_homelab_password | default('changeme123') }}"
+    
+  tasks:
+    - name: Create jedi group
+      group:
+        name: "{{ homelab_user }}"
+        state: present
+        
+    - name: Create jedi user
+      user:
+        name: "{{ homelab_user }}"
+        password: "!"  # Locked account - forces password change on first login
+        shell: /bin/bash
+        createhome: yes
+        state: present
+        group: "{{ homelab_user }}"  # Primary group
+        groups: sudo
+        append: yes
+        password_expire_min: 0
+        password_expire_max: 99999
+
+    - name: Force password change on first login
+      command: chage -d 0 {{ homelab_user }}
+      changed_when: false
+      
+    - name: Set up SSH directory
+      file:
+        path: "/home/{{ homelab_user }}/.ssh"
+        state: directory
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: '0700'
+    
+    - name: Copy SSH public key
+      authorized_key:
+        user: "{{ homelab_user }}"
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        
+    - name: Ensure authorized_keys has correct permissions
+      file:
+        path: "/home/{{ homelab_user }}/.ssh/authorized_keys"
+        owner: "{{ homelab_user }}"
+        group: "{{ homelab_user }}"
+        mode: '0600'
+        
+    - name: Add homelab user to sudoers (requires password)
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ homelab_user }}"
+        line: "{{ homelab_user }} ALL=(ALL:ALL) ALL"
+        validate: 'visudo -cf %s'

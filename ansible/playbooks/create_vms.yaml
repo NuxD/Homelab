@@ -1,18 +1,14 @@
 ---
-# Playbook to create VMs for a k3s cluster using Libvirt
-- name: Create k3s cluster VMs using Libvirt
-  hosts: localhost
-  connection: local
-  gather_facts: no
+# Playbook to create VMs with cloud-init on remote Libvirt host 'z2g5'
+- name: Create k3s cluster VMs on remote Libvirt host
+  hosts: z2g5
+  become: true
+  gather_facts: false
 
   vars:
-    # URL of the Ubuntu cloud image to download
     vm_image_url: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-    # Path where the downloaded image will be stored
     vm_image_path: "/var/lib/libvirt/images/ubuntu-22.04-cloudimg.qcow2"
-    # SSH public key to inject into the VMs for access (supports any key type)
-    ssh_public_key: "{{ lookup('file', lookup('first_found', params={'files': lookup('pipe', 'ls ~/.ssh/*.pub | head -n 1') | default('id_ed25519.pub') })) }}"
-    # List of VM definitions with name, memory, CPU count, and disk size
+    ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILewGSPw6a9tlTNeclwdef59ff08CGRSfZhllPFhWYu0 danielawuks@gmail.com"
     vms:
       - name: k3s-master
         memory: 4096
@@ -28,46 +24,90 @@
         disk_size: 20G
 
   tasks:
-    # Task to download the base image only if it doesn't exist
-    - name: Ensure base image is downloaded
+    - name: Remove existing VM disk images
+      file:
+        path: "/var/lib/libvirt/images/{{ item.name }}.qcow2"
+        state: absent
+      loop: "{{ vms }}"
+    - name: Ensure mkisofs (genisoimage) is installed
+      package:
+        name: genisoimage
+        state: present
+    - name: Check if Ubuntu cloud image already exists
+      stat:
+        path: "{{ vm_image_path }}"
+      register: image_stat
+
+    - name: Download Ubuntu cloud image on remote host
       get_url:
         url: "{{ vm_image_url }}"
         dest: "{{ vm_image_path }}"
         mode: '0644'
-      when: not lookup('fileglob', vm_image_path, errors='ignore')
+      when: not image_stat.stat.exists
 
-    # Loop through each VM in the list to create them
-    - name: Create VMs
+    - name: Create cloud-init config directory for each VM on remote host
+      file:
+        path: "/tmp/{{ item.name }}"
+        state: directory
+        mode: '0700'
+      loop: "{{ vms }}"
+
+    - name: Write user-data file for cloud-init on remote host
+      copy:
+        dest: "/tmp/{{ item.name }}/user-data"
+        content: |
+          #cloud-config
+          hostname: {{ item.name }}
+          users:
+            - name: ubuntu
+              ssh-authorized-keys:
+                - "{{ ssh_public_key }}"
+              sudo: ['ALL=(ALL) NOPASSWD:ALL']
+              shell: /bin/bash
+      loop: "{{ vms }}"
+
+    - name: Write empty meta-data file for cloud-init on remote host
+      copy:
+        dest: "/tmp/{{ item.name }}/meta-data"
+        content: ""
+      loop: "{{ vms }}"
+
+    - name: Create cloud-init ISO for each VM on remote host
+      command: >
+        mkisofs -output /var/lib/libvirt/images/{{ item.name }}-seed.iso
+        -volid cidata -joliet -rock user-data meta-data
+      args:
+        chdir: "/tmp/{{ item.name }}"
+      loop: "{{ vms }}"
+
+    - name: Create VM disk image on remote host
+      command: >
+        qemu-img create -f qcow2 -F qcow2 -b {{ vm_image_path }}
+        /var/lib/libvirt/images/{{ item.name }}.qcow2
+        {{ item.disk_size }}
+      args:
+        creates: "/var/lib/libvirt/images/{{ item.name }}.qcow2"
+      loop: "{{ vms }}"
+
+    - name: Create and start VM with virt-install
+      shell: >
+        virt-install
+        --name {{ item.name }}
+        --memory {{ item.memory }}
+        --vcpus {{ item.vcpus }}
+        --disk path=/var/lib/libvirt/images/{{ item.name }}.qcow2,bus=virtio
+        --disk path=/var/lib/libvirt/images/{{ item.name }}-seed.iso,device=cdrom
+        --os-variant ubuntu22.04
+        --network bridge=virbr0,model=virtio
+        --graphics none
+        --console pty,target_type=serial
+        --import
+        --noautoconsole --wait=0
       loop: "{{ vms }}"
       loop_control:
-        loop_var: vm
-      block:
-        # Generate cloud-init ISO for configuring the VM with SSH access
-        - name: Create cloud-init ISO for {{ vm.name }}
-          community.general.cloud_init:
-            path: "/var/lib/libvirt/images/{{ vm.name }}-seed.iso"
-            hostname: "{{ vm.name }}"
-            username: ubuntu
-            ssh_key: "{{ ssh_public_key }}"
+        label: "{{ item.name }}"
+      register: virt_result
 
-        # Create a new QCOW2 disk image using the base image as a backing file
-        - name: Copy base image for {{ vm.name }}
-          command: >
-            qemu-img create -f qcow2 -b {{ vm_image_path }}
-            /var/lib/libvirt/images/{{ vm.name }}.qcow2
-            {{ vm.disk_size }}
-          creates: "/var/lib/libvirt/images/{{ vm.name }}.qcow2"
-
-        # Define and start the VM with the created disk and cloud-init ISO
-        - name: Define and start VM {{ vm.name }}
-          community.libvirt.libvirt_vm:
-            name: "{{ vm.name }}"
-            memory: "{{ vm.memory }}"
-            vcpus: "{{ vm.vcpus }}"
-            disks:
-              - path: "/var/lib/libvirt/images/{{ vm.name }}.qcow2"
-            cdrom:
-              path: "/var/lib/libvirt/images/{{ vm.name }}-seed.iso"
-            networks:
-              - network: br0
-            state: running
+    - name: Show virt-install output
+      debug:
+        var: virt_result.results

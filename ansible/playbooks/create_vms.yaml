@@ -1,0 +1,73 @@
+---
+# Playbook to create VMs for a k3s cluster using Libvirt
+- name: Create k3s cluster VMs using Libvirt
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    # URL of the Ubuntu cloud image to download
+    vm_image_url: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+    # Path where the downloaded image will be stored
+    vm_image_path: "/var/lib/libvirt/images/ubuntu-22.04-cloudimg.qcow2"
+    # SSH public key to inject into the VMs for access (supports any key type)
+    ssh_public_key: "{{ lookup('file', lookup('first_found', params={'files': lookup('pipe', 'ls ~/.ssh/*.pub | head -n 1') | default('id_ed25519.pub') })) }}"
+    # List of VM definitions with name, memory, CPU count, and disk size
+    vms:
+      - name: k3s-master
+        memory: 4096
+        vcpus: 2
+        disk_size: 20G
+      - name: k3s-worker1
+        memory: 4096
+        vcpus: 2
+        disk_size: 20G
+      - name: k3s-worker2
+        memory: 4096
+        vcpus: 2
+        disk_size: 20G
+
+  tasks:
+    # Task to download the base image only if it doesn't exist
+    - name: Ensure base image is downloaded
+      get_url:
+        url: "{{ vm_image_url }}"
+        dest: "{{ vm_image_path }}"
+        mode: '0644'
+      when: not lookup('fileglob', vm_image_path, errors='ignore')
+
+    # Loop through each VM in the list to create them
+    - name: Create VMs
+      loop: "{{ vms }}"
+      loop_control:
+        loop_var: vm
+      block:
+        # Generate cloud-init ISO for configuring the VM with SSH access
+        - name: Create cloud-init ISO for {{ vm.name }}
+          community.general.cloud_init:
+            path: "/var/lib/libvirt/images/{{ vm.name }}-seed.iso"
+            hostname: "{{ vm.name }}"
+            username: ubuntu
+            ssh_key: "{{ ssh_public_key }}"
+
+        # Create a new QCOW2 disk image using the base image as a backing file
+        - name: Copy base image for {{ vm.name }}
+          command: >
+            qemu-img create -f qcow2 -b {{ vm_image_path }}
+            /var/lib/libvirt/images/{{ vm.name }}.qcow2
+            {{ vm.disk_size }}
+          creates: "/var/lib/libvirt/images/{{ vm.name }}.qcow2"
+
+        # Define and start the VM with the created disk and cloud-init ISO
+        - name: Define and start VM {{ vm.name }}
+          community.libvirt.libvirt_vm:
+            name: "{{ vm.name }}"
+            memory: "{{ vm.memory }}"
+            vcpus: "{{ vm.vcpus }}"
+            disks:
+              - path: "/var/lib/libvirt/images/{{ vm.name }}.qcow2"
+            cdrom:
+              path: "/var/lib/libvirt/images/{{ vm.name }}-seed.iso"
+            networks:
+              - network: br0
+            state: running

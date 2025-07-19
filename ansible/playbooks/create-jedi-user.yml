@@ -1,7 +1,7 @@
 ---
 - name: Create homelab user on all nodes
   hosts: all
-  become: yes
+  become: true
   vars:
     homelab_user: "jedi"
     homelab_password: "{{ vault_homelab_password | default('changeme123') }}"

@@ -1,156 +1,278 @@
+# Homelab Infrastructure
 
-# 🏠 Homelab Infrastructure (Single-Node – HP Z2 G5)
+## Overview
 
-A personal homelab built on a single **HP Z2 Mini G5 workstation**, designed to explore and showcase best practices in **DevOps**, **Cloud**, and **Cybersecurity**.  
-Fully automated with **Ansible**, running **Kubernetes via k3s** in virtual machines, with built-in **monitoring**, **logging**, and **secure remote access** via **Tailscale**.
+Personal homelab built on HP Z2 mini workstations running Proxmox VE with k3s Kubernetes for DevOps learning and gaming. This repository contains all Infrastructure as Code, documentation, and automation scripts to rebuild the entire environment from scratch.
 
+## Architecture
 
+- **Physical**: 2x HP Z2 Mini Workstations (Z2G5: 64GB RAM + NVIDIA GPU, Z2G3: 32GB RAM)
+- **Virtualization**: Proxmox VE 9.x cluster with NFS shared storage
+- **Container Platform**: k3s Kubernetes cluster (1 master + 3 workers)
+- **Automation**: Terraform + Ansible for complete Infrastructure as Code
+- **Gaming**: GPU passthrough VM for low-latency gaming (Apex Legends, etc.)
 
-## 🎯 Goals
+## Quick Start
 
-- 🛠️ Infrastructure-as-Code (Ansible, Terraform)
-- ☸️ Kubernetes + Docker container orchestration
-- 📈 Monitoring, Logging, and Alerting
-- 🔐 Secure remote access (Tailscale VPN, SSH, MFA)
-- 🚀 GitOps workflows with ArgoCD
-- 🔁 CI/CD pipelines and automation
+```bash
+# Clone repository
+git clone https://github.com/NuxD/homelab.git
+cd homelab
 
+# Deploy entire infrastructure
+./scripts/bootstrap.sh
 
-
-## 🖥️ Hardware
-
-- **1x HP Z2 Mini G5 Workstation**
-  - 64 GB RAM
-  - Ubuntu Server 22.04 LTS
-  - SSD/NVMe storage
-  - Wired gigabit network
-
-
-
-## 🧱 Virtualization Layer
-
-- **Libvirt** for VM management  
-- GUI tools: **Virt-Manager** and **Cockpit** for VM lifecycle management  
-- Networking configured to support k3s cluster VMs and allow Tailscale access across the virtual network  
-
-
-
-## 🔐 Remote Access
-
-- **Tailscale** provides secure zero-config VPN across your devices and VMs  
-- SSH with hardened keys and optional MFA  
-- Firewall rules via UFW + Fail2Ban protect host and guests  
-- Tailscale enables seamless access to Kubernetes dashboards, Rancher UI, and other services  
-
-
-
-## ☸️ Kubernetes Cluster (k3s)
-
-A lightweight, production-grade Kubernetes distribution.
-
-**VM Topology:**
-
-| Role          | vCPUs | RAM  | Description                |
-|---------------|-------|------|----------------------------|
-| Control Plane | 2     | 4 GB | Cluster control / API      |
-| Worker Node 1 | 2     | 4 GB | App workloads              |
-| Worker Node 2 | 2     | 4 GB | App workloads              |
-
-
-
-## 🗺️ Architecture Overview
-
-```
-┌────────────────────────────┐
-│     HP Z2 G5 Workstation   │
-│     Ubuntu Server 22.04    │
-└────────────┬───────────────┘
-             │
-        [ Libvirt ]
-             │
- ┌────┬──────────┬────────────┐
- │ CP │ Worker 1 │ Worker 2   │
- └────┴──────────┴────────────┘
-             │
-        [ k3s Cluster ]
-             │
- ┌───────────▼────────────┐
- │  Rancher UI Dashboard  │
- │  Prometheus + Grafana  │
- │  Traefik / MetalLB     │
- └────────────────────────┘
-             │
-        [ Tailscale VPN ]
-             │
-      Remote Devices
+# Or deploy components individually
+cd terraform && terraform apply
+cd ../ansible && ansible-playbook -i inventories/production site.yml
 ```
 
+## Project Status
+
+### ✅ Completed
+- [x] Physical hardware setup with BIOS configuration
+- [x] Proxmox VE cluster installation and configuration
+- [x] NFS shared storage between nodes
+- [ ] Repository structure and documentation
+
+### 🚧 Planned
+- [ ] Network bridges and VLAN configuration
+- [ ] Terraform automation for VM provisioning
+- [ ] Ansible playbooks for k3s deployment
+- [ ] Gaming VM with GPU passthrough configuration
+- [ ] k3s cluster with monitoring stack (Prometheus/Grafana)
+- [ ] CI/CD pipeline (GitLab CE)
+- [ ] Backup and disaster recovery automation
 
 
-## 📦 Features & Services
+## Hardware Specifications
 
-| Area            | Tools / Stack                       |
-|-----------------|-----------------------------------|
-| Monitoring      | Prometheus, Grafana                |
-| Logging         | Loki, Fluent Bit                   |
-| CI/CD           | GitHub Actions, ArgoCD             |
-| GitOps          | ArgoCD or Flux                    |
-| Kubernetes GUI  | Rancher UI, Kubernetes Dashboard  |
-| Storage         | Local Path Provisioner, Longhorn  |
-| Automation      | Ansible, Terraform (libvirt)      |
+| Component | HP Z2 G5 | HP Z2 G3 |
+|-----------|----------|----------|
+| **CPU** | Intel (VT-x/VT-d enabled) | Intel (VT-x/VT-d enabled) |
+| **RAM** | 64GB DDR4 | 32GB DDR4 |
+| **Storage** | NVMe SSD | NVMe SSD |
+| **GPU** | NVIDIA (passthrough ready) | Integrated Graphics |
+| **Network** | Gigabit Ethernet | Gigabit Ethernet |
+| **Role** | Gaming + k3s master/worker | k3s workers + utilities |
 
+## Network Layout
 
+| Network | CIDR | Purpose |
+|---------|------|---------|
+| **LAN** | 192.168.40.0/24 | Main network, VM connectivity |
+| **Pod Network** | 10.42.0.0/16 | Kubernetes pod communication (Flannel) |
+| **Service Network** | 10.43.0.0/16 | Kubernetes services (ClusterIP) |
+| **LoadBalancer Pool** | 192.168.40.150-160 | MetalLB external service IPs |
+| **Cluster Bridge** | 10.0.100.0/24 | Inter-VM communication |
 
-## 📁 Repository Structure
+### IP Address Allocation
+
+| Host/VM | IP Address | Purpose |
+|---------|------------|---------|
+| pve-z2g5 | 192.168.40.13 | Proxmox host + NFS server |
+| pve-z2g3 | 192.168.40.12 | Proxmox host |
+| k3s-master-01 | 192.168.40.100 | Kubernetes control plane |
+| k3s-worker-01 | 192.168.40.101 | Kubernetes worker node |
+| k3s-worker-02 | 192.168.40.102 | Kubernetes worker node |
+| k3s-worker-03 | 192.168.40.103 | Kubernetes worker node |
+| utility-vm | 192.168.40.110 | Monitoring and tools |
+| gaming-vm | 192.168.40.200 | Windows gaming with GPU passthrough |
+
+## Virtual Machine Layout
+
+### Resource Allocation
+
+**Z2G5 Node (64GB RAM total):**
+- Gaming VM: 16GB RAM, 8 CPU cores, GPU passthrough
+- k3s-master-01: 4GB RAM, 2 CPU cores
+- k3s-worker-01: 4GB RAM, 2 CPU cores
+- Host overhead: ~4GB
+- **Available: 36GB RAM**
+
+**Z2G3 Node (32GB RAM total):**
+- k3s-worker-02: 4GB RAM, 2 CPU cores
+- k3s-worker-03: 4GB RAM, 2 CPU cores
+- utility-vm: 4GB RAM, 2 CPU cores
+- Host overhead: ~4GB
+- **Available: 16GB RAM**
+
+## Learning Objectives
+
+This homelab is designed to provide hands-on experience with:
+
+### Infrastructure & Virtualization
+- Type 1 hypervisor management (Proxmox VE)
+- GPU passthrough for gaming workloads
+- Shared storage with NFS
+- Network virtualization and VLANs
+
+### Kubernetes & Container Orchestration
+- k3s lightweight Kubernetes distribution
+- Pod networking with Flannel
+- Service discovery and load balancing
+- Persistent storage management
+- Ingress controllers (Traefik)
+
+### DevOps & Automation
+- Infrastructure as Code (Terraform)
+- Configuration Management (Ansible)
+- CI/CD pipelines (GitLab CE)
+- Container registries and image security
+- Monitoring and observability
+
+### Site Reliability Engineering
+- High availability patterns
+- Backup and disaster recovery
+- Performance monitoring and alerting
+- Log aggregation and analysis
+
+## Repository Structure
 
 ```
 homelab/
-├── ansible/               # Playbooks and roles
-├── terraform/             # Optional: libvirt infrastructure as code
-├── k8s/                   # Helm charts, manifests
-│   ├── manifests/
-│   └── helm-charts/
-├── docs/                  # Diagrams, docs
-│   └── architecture-diagram.png
-└── README.md
+├── README.md                    # This file
+├── docs/                        # Documentation
+│   ├── architecture/            # Architecture diagrams and decisions
+│   ├── setup-guides/           # Step-by-step setup instructions
+│   ├── troubleshooting/        # Common issues and solutions
+│   └── learning-notes/         # Study notes and references
+├── terraform/                  # Infrastructure as Code
+│   ├── proxmox/               # Proxmox provider configuration
+│   ├── modules/               # Reusable Terraform modules
+│   └── environments/          # Environment-specific configs
+├── ansible/                   # Configuration Management
+│   ├── inventories/          # Host and group definitions
+│   ├── playbooks/           # Automation playbooks
+│   ├── roles/               # Reusable roles
+│   └── group_vars/          # Variable definitions
+├── scripts/                  # Automation scripts
+│   ├── bootstrap.sh         # Complete environment setup
+│   ├── backup.sh           # Backup automation
+│   └── destroy.sh          # Environment teardown
+├── configs/                 # Configuration files
+│   ├── proxmox/            # Proxmox configurations
+│   ├── k3s/                # Kubernetes manifests
+│   └── applications/       # Application configurations
+├── monitoring/             # Monitoring and observability
+│   ├── dashboards/        # Grafana dashboards
+│   ├── alerts/           # AlertManager rules
+│   └── exporters/        # Custom metric exporters
+└── .github/              # GitHub workflows (if using GitHub)
+    └── workflows/        # CI/CD automation
+```
+
+## Prerequisites
+
+### Required Software (Local Machine)
+- **Terraform** >= 1.6.0
+- **Ansible** >= 2.15.0
+- **kubectl** >= 1.28.0
+- **Git** >= 2.40.0
+
+### Required Access
+- SSH access to both Proxmox nodes
+- Proxmox web interface access
+- Network connectivity to 192.168.40.0/24 subnet
+
+## Getting Started
+
+### 1. Initial Setup
+
+```bash
+# Clone and setup repository
+git clone https://github.com/NuxD/homelab.git
+cd homelab
+
+# Install required tools (Ubuntu/Debian)
+./scripts/install-tools.sh
+
+# Configure environment
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+cp ansible/inventories/production.example ansible/inventories/production
+
+# Edit configuration files with your specific details
+```
+
+### 2. Deploy Infrastructure
+
+```bash
+# Option 1: Full automated deployment
+./scripts/bootstrap.sh
+
+# Option 2: Step-by-step deployment
+cd terraform
+terraform init
+terraform plan
+terraform apply
+
+cd ../ansible
+ansible-playbook -i inventories/production site.yml
+```
+
+### 3. Verify Deployment
+
+```bash
+# Check Proxmox cluster
+ssh root@pve-z2g5 "pvecm status"
+
+# Check k3s cluster
+kubectl get nodes
+kubectl get pods --all-namespaces
+
+# Access services
+curl http://grafana.homelab.local
+curl http://gitlab.homelab.local
+```
+
+## Disaster Recovery
+
+### Backup Strategy
+- **Proxmox**: VM configurations and snapshots
+- **k3s**: etcd backups and persistent volume snapshots
+- **Applications**: Database dumps and configuration exports
+- **Infrastructure**: All code in Git with tagged releases
+
+### Recovery Process
+```bash
+# Complete environment rebuild
+./scripts/destroy.sh
+./scripts/bootstrap.sh
+
+# Restore from backup
+./scripts/restore-backup.sh [backup-date]
 ```
 
 
+## Security Considerations
 
-## 🧪 Use Cases
+- **SSH Keys**: Use key-based authentication, disable password auth
+- **Network**: Firewall rules limit access to management interfaces
+- **Secrets**: Ansible Vault for sensitive data, never commit secrets
+- **Updates**: Regular security updates via automation
+- **Monitoring**: Security event monitoring and alerting
 
-- Deploy microservices with Helm and GitOps  
-- Simulate production cluster locally  
-- Practice Kubernetes security (RBAC, PSP, Network Policies)  
-- Self-host DevOps tools (Jenkins, Gitea, etc.)  
-- Build internal dashboards and metrics  
-- Learn secure remote access and infrastructure hardening  
+## Learning Resources
 
+### Documentation
+- [Proxmox VE Documentation](https://pve.proxmox.com/wiki/Main_Page)
+- [k3s Documentation](https://docs.k3s.io/)
+- [Terraform Proxmox Provider](https://registry.terraform.io/providers/Telmate/proxmox/latest/docs)
 
-
-## 📍 Roadmap
-
-- [ ] 🔧 Automate Libvirt VM provisioning with Ansible or Terraform  
-- [ ] 🌐 Improve Tailscale access control and ACLs for service-level segmentation  
-- [ ] ☸️ Expand k3s cluster with additional worker VMs for scaling/testing  
-- [ ] 📦 Deploy GitOps tools like ArgoCD or Flux to manage manifests  
-- [ ] 📊 Integrate full observability stack (Prometheus + Grafana + Loki)  
-- [ ] 🔐 Add centralized secrets management (e.g., HashiCorp Vault or sealed-secrets)  
-- [ ] 📁 Implement shared or replicated storage (Longhorn / NFS)  
-- [ ] 💡 Self-host DevOps tools (e.g., Gitea, Jenkins, Drone CI) for pipeline practice  
-- [ ] 🧪 Simulate real-world scenarios: failover, load testing, cluster upgrades  
-- [ ] 🛡️ Apply Kubernetes security: RBAC, Network Policies, PodSecurity Standards  
-- [ ] 📚 Document playbooks, VM definitions, and architecture for reproducibility  
+### Courses & Tutorials
+- [Proxmox Homelab Series](https://www.youtube.com/playlist?list=PLT98CRl2KxKHnlbYhtABg6cF50bYa8Ulo)
 
 
+## Acknowledgments
 
-## 🙌 Acknowledgements
+- Proxmox team for excellent virtualization platform
+- k3s team for lightweight Kubernetes
+- HashiCorp for Terraform
+- Red Hat for Ansible
+- The homelab community for inspiration and knowledge sharing
 
-- [k3s](https://k3s.io/)  
-- [Rancher](https://rancher.com/)  
-- [Libvirt](https://libvirt.org/)  
-- [Tailscale](https://tailscale.com/)  
-- [Ansible](https://www.ansible.com/)  
-- [Grafana](https://grafana.com/)  
-- [ArgoCD](https://argo-cd.readthedocs.io/)
+---
 
+**Last Updated**: $(date +%Y-%m-%d)  
+**Project Status**: 🚧 Active Development  
+**Next Milestone**: k3s cluster deployment automation

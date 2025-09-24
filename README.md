@@ -77,7 +77,7 @@ cd ../ansible && ansible-playbook -i inventories/production site.yml
 | k3s-worker-02 | 192.168.40.102 | Kubernetes worker node |
 | k3s-worker-03 | 192.168.40.103 | Kubernetes worker node |
 | utility-vm | 192.168.40.110 | Monitoring and tools |
-| gaming-vm | 192.168.40.200 | Windows gaming with GPU passthrough |
+
 
 ## Virtual Machine Layout
 
@@ -263,16 +263,5 @@ curl http://gitlab.homelab.local
 - [Proxmox Homelab Series](https://www.youtube.com/playlist?list=PLT98CRl2KxKHnlbYhtABg6cF50bYa8Ulo)
 
 
-## Acknowledgments
-
-- Proxmox team for excellent virtualization platform
-- k3s team for lightweight Kubernetes
-- HashiCorp for Terraform
-- Red Hat for Ansible
-- The homelab community for inspiration and knowledge sharing
-
----
-
-**Last Updated**: $(date +%Y-%m-%d)  
 **Project Status**: 🚧 Active Development  
 **Next Milestone**: k3s cluster deployment automation

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Personal homelab built on HP Z2 mini workstations running Proxmox VE with k3s Kubernetes for DevOps learning and gaming. This repository contains all Infrastructure as Code, documentation, and automation scripts to rebuild the entire environment from scratch.
+Personal homelab built on HP Z2 mini workstations running Proxmox VE with k3s Kubernetes. This repository contains all Infrastructure as Code, documentation, and automation scripts to rebuild the entire environment from scratch.
 
 ## Architecture
 
@@ -10,36 +10,15 @@ Personal homelab built on HP Z2 mini workstations running Proxmox VE with k3s Ku
 - **Virtualization**: Proxmox VE 9.x cluster with NFS shared storage
 - **Container Platform**: k3s Kubernetes cluster (1 master + 3 workers)
 - **Automation**: Terraform + Ansible for complete Infrastructure as Code
-- **Gaming**: GPU passthrough VM for low-latency gaming (Apex Legends, etc.)
-
-## Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/NuxD/homelab.git
-cd homelab
-
-# Deploy entire infrastructure
-./scripts/bootstrap.sh
-
-# Or deploy components individually
-cd terraform && terraform apply
-cd ../ansible && ansible-playbook -i inventories/production site.yml
-```
 
 ## Project Status
 
-### ✅ Completed
 - [x] Physical hardware setup with BIOS configuration
 - [x] Proxmox VE cluster installation and configuration
 - [x] NFS shared storage between nodes
-- [ ] Repository structure and documentation
-
-### 🚧 Planned
+- [x] Terraform automation for VM provisioning
 - [ ] Network bridges and VLAN configuration
-- [ ] Terraform automation for VM provisioning
 - [ ] Ansible playbooks for k3s deployment
-- [ ] Gaming VM with GPU passthrough configuration
 - [ ] k3s cluster with monitoring stack (Prometheus/Grafana)
 - [ ] CI/CD pipeline (GitLab CE)
 - [ ] Backup and disaster recovery automation
@@ -52,9 +31,8 @@ cd ../ansible && ansible-playbook -i inventories/production site.yml
 | **CPU** | Intel (VT-x/VT-d enabled) | Intel (VT-x/VT-d enabled) |
 | **RAM** | 64GB DDR4 | 32GB DDR4 |
 | **Storage** | NVMe SSD | NVMe SSD |
-| **GPU** | NVIDIA (passthrough ready) | Integrated Graphics |
 | **Network** | Gigabit Ethernet | Gigabit Ethernet |
-| **Role** | Gaming + k3s master/worker | k3s workers + utilities |
+| **Role** | k3s master/worker | k3s workers + utilities |
 
 ## Network Layout
 
@@ -109,7 +87,6 @@ This homelab is designed to provide hands-on experience with:
 
 ### Kubernetes & Container Orchestration
 - k3s lightweight Kubernetes distribution
-- Pod networking with Flannel
 - Service discovery and load balancing
 - Persistent storage management
 - Ingress controllers (Traefik)
@@ -117,7 +94,7 @@ This homelab is designed to provide hands-on experience with:
 ### DevOps & Automation
 - Infrastructure as Code (Terraform)
 - Configuration Management (Ansible)
-- CI/CD pipelines (GitLab CE)
+- CI/CD pipelines
 - Container registries and image security
 - Monitoring and observability
 
@@ -127,45 +104,8 @@ This homelab is designed to provide hands-on experience with:
 - Performance monitoring and alerting
 - Log aggregation and analysis
 
-## Repository Structure
-
-```
-homelab/
-├── README.md                    # This file
-├── docs/                        # Documentation
-│   ├── architecture/            # Architecture diagrams and decisions
-│   ├── setup-guides/           # Step-by-step setup instructions
-│   ├── troubleshooting/        # Common issues and solutions
-│   └── learning-notes/         # Study notes and references
-├── terraform/                  # Infrastructure as Code
-│   ├── proxmox/               # Proxmox provider configuration
-│   ├── modules/               # Reusable Terraform modules
-│   └── environments/          # Environment-specific configs
-├── ansible/                   # Configuration Management
-│   ├── inventories/          # Host and group definitions
-│   ├── playbooks/           # Automation playbooks
-│   ├── roles/               # Reusable roles
-│   └── group_vars/          # Variable definitions
-├── scripts/                  # Automation scripts
-│   ├── bootstrap.sh         # Complete environment setup
-│   ├── backup.sh           # Backup automation
-│   └── destroy.sh          # Environment teardown
-├── configs/                 # Configuration files
-│   ├── proxmox/            # Proxmox configurations
-│   ├── k3s/                # Kubernetes manifests
-│   └── applications/       # Application configurations
-├── monitoring/             # Monitoring and observability
-│   ├── dashboards/        # Grafana dashboards
-│   ├── alerts/           # AlertManager rules
-│   └── exporters/        # Custom metric exporters
-└── .github/              # GitHub workflows (if using GitHub)
-    └── workflows/        # CI/CD automation
-```
-
-## Prerequisites
-
 ### Required Software (Local Machine)
-- **Terraform** >= 1.6.0
+- **Terraform** >= 3.0.2-rc04
 - **Ansible** >= 2.15.0
 - **kubectl** >= 1.28.0
 - **Git** >= 2.40.0
@@ -174,75 +114,6 @@ homelab/
 - SSH access to both Proxmox nodes
 - Proxmox web interface access
 - Network connectivity to 192.168.40.0/24 subnet
-
-## Getting Started
-
-### 1. Initial Setup
-
-```bash
-# Clone and setup repository
-git clone https://github.com/NuxD/homelab.git
-cd homelab
-
-# Install required tools (Ubuntu/Debian)
-./scripts/install-tools.sh
-
-# Configure environment
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-cp ansible/inventories/production.example ansible/inventories/production
-
-# Edit configuration files with your specific details
-```
-
-### 2. Deploy Infrastructure
-
-```bash
-# Option 1: Full automated deployment
-./scripts/bootstrap.sh
-
-# Option 2: Step-by-step deployment
-cd terraform
-terraform init
-terraform plan
-terraform apply
-
-cd ../ansible
-ansible-playbook -i inventories/production site.yml
-```
-
-### 3. Verify Deployment
-
-```bash
-# Check Proxmox cluster
-ssh root@pve-z2g5 "pvecm status"
-
-# Check k3s cluster
-kubectl get nodes
-kubectl get pods --all-namespaces
-
-# Access services
-curl http://grafana.homelab.local
-curl http://gitlab.homelab.local
-```
-
-## Disaster Recovery
-
-### Backup Strategy
-- **Proxmox**: VM configurations and snapshots
-- **k3s**: etcd backups and persistent volume snapshots
-- **Applications**: Database dumps and configuration exports
-- **Infrastructure**: All code in Git with tagged releases
-
-### Recovery Process
-```bash
-# Complete environment rebuild
-./scripts/destroy.sh
-./scripts/bootstrap.sh
-
-# Restore from backup
-./scripts/restore-backup.sh [backup-date]
-```
-
 
 ## Security Considerations
 

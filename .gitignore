@@ -1,1 +1,6 @@
 **/logs
+**/terraform.tfvars
+terraform.tfstate*
+.terraform/
+.terraform.lock.hcl
+.DS_Store
